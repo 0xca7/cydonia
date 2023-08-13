@@ -9,7 +9,12 @@ Utilities currently integrated in Cydonia:
 - [x] output numbers in binary
 - [x] hexdump to screen and file
 - [x] read and write files
-- [ ] TCP/UDP Server/Client
+- [x] TCP Server/Client
+- [ ] UDP Server/Client
+
+Testing
+- [x] unit tests for functions
+- [x] valgrind testing for allocations
 
 ## Usage
 

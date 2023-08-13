@@ -21,6 +21,11 @@
 #include <errno.h>
 #include <unistd.h>
 
+#include <sys/types.h>    
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 /*****************************************************************************
  * MACROS
  */
@@ -35,6 +40,7 @@
 /*****************************************************************************
  * DATASTRUCTURES
  */
+
 typedef enum 
 {
     CYDONIA_BITS8  = 8,
@@ -43,6 +49,13 @@ typedef enum
     CYDONIA_BITS64 = 64,
 }
 e_BITS_t;
+
+/*  @brief implement a function to handle a new client for a server 
+          or as a connection handler for a client. 
+    @note expects a socket as an argument, expected to return -1 on error,
+          and 0 on success
+    */
+typedef int (cydonia_tcp_handler_t)(int);
 
 /*****************************************************************************
  * GLOBALS 
@@ -85,7 +98,6 @@ cydonia_write_file(const char *p_path, const void *p_buf, size_t siz);
 
 /*** HEXDUMP ***/
 
-
 /**
  * @brief hexdump a buffer of `size` bytes, 16 bytes wide
  * @param p_buf the buffer to dump
@@ -105,6 +117,8 @@ cydonia_hexdump(const uint8_t *p_buf, size_t siz);
 extern int
 cydonia_hexdump_to_file(const char *p_path, const uint8_t *p_buf, size_t siz);
 
+/*** BINARY ***/
+
 /**
  * @brief print a number as binary
  * @param number the number to print - cast to uint64_t
@@ -122,6 +136,31 @@ cydonia_print_binary(uint64_t number, e_BITS_t bits);
  */
 extern void
 cydonia_print_binary_verbose(uint64_t number, e_BITS_t bits);
+
+/*** NETWORKING ***/
+
+/**
+ * @brief a simple tcp server implementation
+ * @param ip the ip to listen on, or NULL to listen on INADDR_ANY
+ * @param port the port to listen on
+ * @param p_handler the handler for the client connection
+ * @return -1 on error or the result of the p_handler
+ */
+extern int
+cydonia_tcp_server(const char *ip, uint16_t port, 
+    cydonia_tcp_handler_t *p_handler);
+
+/**
+ * @brief a simple tcp client implementation
+ * @param ip the ip to connect to 
+ * @param port the port to connect to
+ * @param p_handler the handler for the connection
+ * @return -1 on error or the result of the p_handler
+ */
+extern int
+cydonia_tcp_client(const char *ip, uint16_t port, 
+    cydonia_tcp_handler_t *p_handler);
+
 
 /*****************************************************************************/
 

@@ -8,5 +8,5 @@ target_include_directories(cydonia PUBLIC
 
 # libraries can be linked here if needed
 target_link_libraries(cydonia PUBLIC
-    global
+    #global
 )

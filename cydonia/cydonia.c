@@ -338,7 +338,7 @@ cydonia_print_binary_verbose(uint64_t number, e_BITS_t bits)
 
     for(i = bits-1; i >= 0; i--)
     {
-        printf("%ld ", i);
+        printf("%d ", i);
         if(i <= 9)
         {
             printf(" ");
@@ -346,6 +346,130 @@ cydonia_print_binary_verbose(uint64_t number, e_BITS_t bits)
     }
 
     printf("\n\n");
+}
+
+int
+cydonia_tcp_server(const char *ip, uint16_t port, 
+    cydonia_tcp_handler_t *p_handler)
+{
+    int ret = -1;
+    int sock = -1;
+    int clientsock = -1;
+    struct sockaddr_in addr = {0};
+    struct sockaddr_in peer = {0};
+    socklen_t addrlen = 0;
+    const int enable = 1;
+
+    if(CHECK_NULL((const void*)p_handler))
+    {
+        goto TCPSERVER_FAILURE;
+    }
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(-1 == sock)
+    {
+        cydonia_print_error("(tcp server) error creating socket", "socket");
+        goto TCPSERVER_FAILURE;
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    if(ip)
+    {
+        addr.sin_addr.s_addr = inet_addr(ip);
+        if(-1 == addr.sin_addr.s_addr)
+        {
+            cydonia_print_error("(tcp_server) ip address invalid", "inet_addr");
+            goto TCPSERVER_FAILURE;
+        }
+    } 
+    else 
+    {
+        addr.sin_addr.s_addr = INADDR_ANY;
+    }
+
+    /* get rid of "address already in use" */
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
+    {
+        cydonia_print_error("(tcp_server) error setsockopt", "setsockopt");
+        goto TCPSERVER_FAILURE;
+    }
+
+    ret = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
+    if(-1 == ret)
+    {
+        cydonia_print_error("(tcp_server) error binding socket", "bind");
+        goto TCPSERVER_FAILURE;
+    }
+
+    /* TODO: backlog as macro? */
+    ret = listen(sock, 10);
+    if(-1 == ret)
+    {
+        cydonia_print_error("(tcp_server) error listen", "listen");
+        goto TCPSERVER_FAILURE;
+    }
+
+    clientsock = accept(sock, (struct sockaddr*)&peer, &addrlen);
+    if(-1 == clientsock)
+    {
+        cydonia_print_error("(tcp_server) error accept", "accept");
+        goto TCPSERVER_FAILURE;
+    }
+
+    ret = p_handler(clientsock);
+
+TCPSERVER_FAILURE:
+    close(sock); /* TODO: handle error? */
+    return ret;
+}
+
+extern int
+cydonia_tcp_client(const char *ip, uint16_t port, 
+    cydonia_tcp_handler_t *p_handler)
+{
+    int ret = -1;
+    int sock = -1;
+    struct sockaddr_in addr = {0};
+
+    if(CHECK_NULL((const void*)p_handler))
+    {
+        goto TCPLCIENT_FAILURE;
+    }
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(-1 == sock)
+    {
+        cydonia_print_error("(tcp_client) error creating socket", "socket");
+        goto TCPLCIENT_FAILURE;
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    if(ip)
+    {
+        addr.sin_addr.s_addr = inet_addr(ip);
+        if(-1 == addr.sin_addr.s_addr)
+        {
+            cydonia_print_error("(tcp_client) ip address invalid", "inet_addr");
+            goto TCPLCIENT_FAILURE;
+        }
+    } 
+
+    ret = connect(sock, (const struct sockaddr*)&addr, 
+        sizeof(struct sockaddr_in));
+    if(-1 == ret) 
+    {
+        cydonia_print_error("(tcp_client) connect failed", "connect");
+        goto TCPLCIENT_FAILURE;
+    }
+
+    ret = p_handler(sock);
+
+TCPLCIENT_FAILURE:
+    close(sock); /* TODO: handle error? */
+    return ret;
+
 }
 
 /*****************************************************************************/
