@@ -50,12 +50,19 @@ typedef enum
 }
 e_BITS_t;
 
+typedef enum 
+{
+    CYDONIA_NET_TYPE_TCP,
+    CYDONIA_NET_TYPE_UDP,
+}
+e_NET_TYPE_t;
+
 /*  @brief implement a function to handle a new client for a server 
           or as a connection handler for a client. 
-    @note expects a socket as an argument, expected to return -1 on error,
-          and 0 on success
-    */
-typedef int (cydonia_tcp_handler_t)(int);
+    @note expects a socket as an argument and a sockaddr_in (UDP) 
+          expected to return -1 on error, and 0 on success
+*/
+typedef int (cydonia_net_handler_fnctn_t)(int, struct sockaddr_in*);
 
 /*****************************************************************************
  * GLOBALS 
@@ -140,27 +147,28 @@ cydonia_print_binary_verbose(uint64_t number, e_BITS_t bits);
 /*** NETWORKING ***/
 
 /**
- * @brief a simple tcp server implementation
+ * @brief a simple server implementation
+ * @param type the server type, see @e_NET_TYPE_t
  * @param ip the ip to listen on, or NULL to listen on INADDR_ANY
  * @param port the port to listen on
  * @param p_handler the handler for the client connection
  * @return -1 on error or the result of the p_handler
  */
 extern int
-cydonia_tcp_server(const char *ip, uint16_t port, 
-    cydonia_tcp_handler_t *p_handler);
+cydonia_net_server(e_NET_TYPE_t type, char *ip, uint16_t port, 
+    cydonia_net_handler_fnctn_t *p_handler);
 
 /**
- * @brief a simple tcp client implementation
+ * @brief a simple client implementation
+ * @param type the client type see @e_NET_TYPE_t
  * @param ip the ip to connect to 
  * @param port the port to connect to
  * @param p_handler the handler for the connection
  * @return -1 on error or the result of the p_handler
  */
 extern int
-cydonia_tcp_client(const char *ip, uint16_t port, 
-    cydonia_tcp_handler_t *p_handler);
-
+cydonia_net_client(e_NET_TYPE_t type, char *ip, uint16_t port, 
+    cydonia_net_handler_fnctn_t *p_handler);
 
 /*****************************************************************************/
 

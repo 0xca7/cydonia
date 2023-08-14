@@ -29,7 +29,6 @@
  * DATASTRUCTURES
  */
 
-
 /*****************************************************************************
  * PRIVATE FUNCTION PROTOTYPES 
  */
@@ -43,7 +42,6 @@
  */
 static int
 _cydonia_hexdump(const uint8_t *p_buf, size_t siz, FILE **fp);
-
 
 /*****************************************************************************
  * PRIVATE FUNCTIONS
@@ -145,7 +143,6 @@ _cydonia_hexdump(const uint8_t *p_buf, size_t siz, FILE **fp)
 
     return 0;
 }
-
 
 /*****************************************************************************
  * PUBLIC FUNCTIONS
@@ -349,11 +346,12 @@ cydonia_print_binary_verbose(uint64_t number, e_BITS_t bits)
 }
 
 int
-cydonia_tcp_server(const char *ip, uint16_t port, 
-    cydonia_tcp_handler_t *p_handler)
+cydonia_net_server(e_NET_TYPE_t type, char *ip, uint16_t port, 
+    cydonia_net_handler_fnctn_t *p_handler)
 {
     int ret = -1;
     int sock = -1;
+    int net_type = -1;
     int clientsock = -1;
     struct sockaddr_in addr = {0};
     struct sockaddr_in peer = {0};
@@ -362,14 +360,27 @@ cydonia_tcp_server(const char *ip, uint16_t port,
 
     if(CHECK_NULL((const void*)p_handler))
     {
-        goto TCPSERVER_FAILURE;
+        goto NET_SERVER_FAILURE;
     }
 
-    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(CYDONIA_NET_TYPE_TCP == type)
+    {
+        sock = socket(AF_INET, SOCK_STREAM, 0);
+    }
+    else if(CYDONIA_NET_TYPE_UDP == type)
+    {
+        sock = socket(AF_INET, SOCK_DGRAM, 0);
+    }
+    else
+    {
+        cydonia_print_error("(net_server) error server type", NULL);
+        goto NET_SERVER_FAILURE;
+    }
+
     if(-1 == sock)
     {
         cydonia_print_error("(tcp server) error creating socket", "socket");
-        goto TCPSERVER_FAILURE;
+        goto NET_SERVER_FAILURE;
     }
 
     addr.sin_family = AF_INET;
@@ -379,95 +390,122 @@ cydonia_tcp_server(const char *ip, uint16_t port,
         addr.sin_addr.s_addr = inet_addr(ip);
         if(-1 == addr.sin_addr.s_addr)
         {
-            cydonia_print_error("(tcp_server) ip address invalid", "inet_addr");
-            goto TCPSERVER_FAILURE;
+            cydonia_print_error("(net_server) ip address invalid", "inet_addr");
+            goto NET_SERVER_FAILURE;
         }
     } 
     else 
     {
+        printf("[+] no IP specified, setting to \"ANY\"\n");
         addr.sin_addr.s_addr = INADDR_ANY;
     }
 
     /* get rid of "address already in use" */
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
     {
-        cydonia_print_error("(tcp_server) error setsockopt", "setsockopt");
-        goto TCPSERVER_FAILURE;
+        cydonia_print_error("(net_server) error setsockopt", "setsockopt");
+        goto NET_SERVER_FAILURE;
     }
 
     ret = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
     if(-1 == ret)
     {
-        cydonia_print_error("(tcp_server) error binding socket", "bind");
-        goto TCPSERVER_FAILURE;
+        cydonia_print_error("(net_server) error binding socket", "bind");
+        goto NET_SERVER_FAILURE;
     }
 
-    /* TODO: backlog as macro? */
-    ret = listen(sock, 10);
-    if(-1 == ret)
+    if(CYDONIA_NET_TYPE_TCP == type)
     {
-        cydonia_print_error("(tcp_server) error listen", "listen");
-        goto TCPSERVER_FAILURE;
-    }
+        /* TODO: backlog as macro? */
+        ret = listen(sock, 10);
+        if(-1 == ret)
+        {
+            cydonia_print_error("(net_server) error listen", "listen");
+            goto NET_SERVER_FAILURE;
+        }
 
-    clientsock = accept(sock, (struct sockaddr*)&peer, &addrlen);
-    if(-1 == clientsock)
+        clientsock = accept(sock, (struct sockaddr*)&peer, &addrlen);
+        if(-1 == clientsock)
+        {
+            cydonia_print_error("(net_server) error accept", "accept");
+            goto NET_SERVER_FAILURE;
+        }
+
+        ret = p_handler(clientsock, &peer);
+    }
+    else
     {
-        cydonia_print_error("(tcp_server) error accept", "accept");
-        goto TCPSERVER_FAILURE;
+        /* we can do else here, we already checked the type above */
+        ret = p_handler(sock, &peer);
     }
 
-    ret = p_handler(clientsock);
-
-TCPSERVER_FAILURE:
-    close(sock); /* TODO: handle error? */
+NET_SERVER_FAILURE:
+    if(sock != -1)
+    {
+        close(sock); /* TODO: handle error? */
+    }
     return ret;
 }
 
 extern int
-cydonia_tcp_client(const char *ip, uint16_t port, 
-    cydonia_tcp_handler_t *p_handler)
+cydonia_net_client(e_NET_TYPE_t type, char *ip, uint16_t port, 
+    cydonia_net_handler_fnctn_t *p_handler)
 {
     int ret = -1;
     int sock = -1;
+    int net_type = -1;
     struct sockaddr_in addr = {0};
 
-    if(CHECK_NULL((const void*)p_handler))
+    if(CHECK_NULL(ip) || CHECK_NULL((const void*)p_handler))
     {
-        goto TCPLCIENT_FAILURE;
+        goto NETCLIENT_FAILURE;
     }
 
-    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(CYDONIA_NET_TYPE_TCP == type)
+    {
+        net_type = SOCK_STREAM;
+    }
+    else if(CYDONIA_NET_TYPE_UDP == type)
+    {
+        net_type = SOCK_DGRAM;
+    }
+    else
+    {
+        cydonia_print_error("(net_client) error client type", NULL);
+        goto NETCLIENT_FAILURE;
+    }
+
+    sock = socket(AF_INET, net_type, 0);
     if(-1 == sock)
     {
-        cydonia_print_error("(tcp_client) error creating socket", "socket");
-        goto TCPLCIENT_FAILURE;
+        cydonia_print_error("(net_client) error creating socket", "socket");
+        goto NETCLIENT_FAILURE;
     }
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    if(ip)
+    addr.sin_addr.s_addr = inet_addr(ip);
+    if(-1 == addr.sin_addr.s_addr)
     {
-        addr.sin_addr.s_addr = inet_addr(ip);
-        if(-1 == addr.sin_addr.s_addr)
-        {
-            cydonia_print_error("(tcp_client) ip address invalid", "inet_addr");
-            goto TCPLCIENT_FAILURE;
-        }
-    } 
+        cydonia_print_error("(net_client) ip address invalid", "inet_addr");
+        goto NETCLIENT_FAILURE;
+    }
 
     ret = connect(sock, (const struct sockaddr*)&addr, 
         sizeof(struct sockaddr_in));
     if(-1 == ret) 
     {
-        cydonia_print_error("(tcp_client) connect failed", "connect");
-        goto TCPLCIENT_FAILURE;
+        cydonia_print_error("(net_client) connect failed", "connect");
+        goto NETCLIENT_FAILURE;
     }
 
-    ret = p_handler(sock);
+    ret = p_handler(sock, &addr);
 
-TCPLCIENT_FAILURE:
-    close(sock); /* TODO: handle error? */
+NETCLIENT_FAILURE:
+    if(sock != -1)
+    {
+        close(sock); /* TODO: handle error? */
+    }
     return ret;
 
 }

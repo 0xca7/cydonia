@@ -29,7 +29,7 @@ TEST_GROUP(Cydonia)
  * @brief the handler for a connected client 
  */
 static int 
-net_client_handler(int sockfd)
+net_tcp_client_handler(int sockfd, struct sockaddr_in *p_addr)
 {
     ssize_t bread = -1;
     uint8_t buf[32] = { 0x00 };
@@ -49,10 +49,10 @@ net_client_handler(int sockfd)
 }
 
 /**
- * @brief the handler for a client 
+ * @brief the handler for a server
  */
 static int 
-net_connection_handler(int sockfd)
+net_tcp_handler(int sockfd, struct sockaddr_in *p_addr)
 {
     ssize_t bwrite = -1;
     uint8_t buf[32] = { 0x00 };
@@ -67,6 +67,63 @@ net_connection_handler(int sockfd)
     if(-1 == bwrite)
     {
         fprintf(stderr, "[!] send: %s", strerror(errno));
+        return -1;    
+    }
+
+    printf("[+] sent buffer:\n");
+    cydonia_hexdump(buf, 32);
+
+    return 0;
+}
+
+/**
+ * @brief the handler for a connected client 
+ */
+static int 
+net_udp_client_handler(int sockfd, struct sockaddr_in *p_addr)
+{
+    ssize_t bread = -1;
+    uint8_t buf[32] = { 0x00 };
+    socklen_t socklen = sizeof(struct sockaddr_in);
+    printf("[+] client_handler started\n");
+
+    for(int i = 0; i < 32; i++)
+    {
+        buf[i] = (uint8_t)(i % 256);
+    }
+
+    bread = sendto(sockfd, &buf[0], 32, 0, (struct sockaddr*)p_addr, 
+        socklen);
+    if(-1 == bread)
+    {
+        fprintf(stderr, "[!] sendto: %s", strerror(errno));
+        return -1;    
+    }
+
+    printf("[+] received buffer:\n");
+    cydonia_hexdump(buf, 32);
+
+    return 0;
+}
+
+/**
+ * @brief the handler for a server
+ */
+static int 
+net_udp_handler(int sockfd, struct sockaddr_in *p_addr)
+{
+    ssize_t bwrite = -1;
+    uint8_t buf[32] = { 0x00 };
+
+    socklen_t socklen = sizeof(struct sockaddr_in);
+
+    printf("[+] connection handler started\n");
+
+    bwrite = recvfrom(sockfd, &buf[0], 32, 0, (struct sockaddr*)p_addr, 
+        &socklen);
+    if(-1 == bwrite)
+    {
+        fprintf(stderr, "[!] sendto: %s", strerror(errno));
         return -1;    
     }
 
@@ -150,9 +207,10 @@ static void*
 test_tcp_server_thread(void *args)
 {
     printf("[+] TEST TCP SERVER\n");
-    cydonia_tcp_handler_t *p_handler = NULL;
-    p_handler = net_client_handler;
-    CHECK( cydonia_tcp_server("127.0.0.1", 7777, p_handler) == 0 );
+    cydonia_net_handler_fnctn_t *p_handler = NULL;
+    p_handler = net_tcp_client_handler;
+    CHECK( cydonia_net_server(CYDONIA_NET_TYPE_TCP, "127.0.0.1", 
+        7777, p_handler) == 0 );
     return NULL;
 }
 
@@ -161,29 +219,49 @@ test_tcp_client_thread(void *args)
 {
     printf("[+] TEST TCP CLIENT\n");
     sleep(1); /* server must be able to start listening */
-    cydonia_tcp_handler_t *p_handler = NULL;
-    p_handler = net_connection_handler;
-    CHECK( cydonia_tcp_client("127.0.0.1", 7777, p_handler) == 0 );
+    cydonia_net_handler_fnctn_t *p_handler = NULL;
+    p_handler = net_tcp_handler;
+    CHECK( cydonia_net_client(CYDONIA_NET_TYPE_TCP, "127.0.0.1", 
+        7777, p_handler) == 0 );
     return NULL;
 }
 
-TEST(Cydonia, cydona_tcp) {
+static void*
+test_udp_server_thread(void *args)
+{
+    printf("[+] TEST UDP SERVER\n");
+    cydonia_net_handler_fnctn_t *p_handler = NULL;
+    p_handler = net_udp_handler;
+    CHECK( cydonia_net_server(CYDONIA_NET_TYPE_UDP, "127.0.0.1", 
+        8888, p_handler) == 0 );
+    return NULL;
+}
+static void*
+test_udp_client_thread(void *args)
+{
+    printf("[+] TEST UDP CLIENT\n");
+    sleep(1); /* server must be able to start listening */
+    cydonia_net_handler_fnctn_t *p_handler = NULL;
+    p_handler = net_udp_client_handler;
+    CHECK( cydonia_net_client(CYDONIA_NET_TYPE_UDP, "127.0.0.1", 
+        8888, p_handler) == 0 );
+    return NULL;
+}
+
+TEST(Cydonia, cydona_net) {
 
     int ret = -1;
     pthread_t server_thread = 0;
     pthread_t client_thread = 0;
 
-    cydonia_tcp_handler_t *p_handler = NULL;
-    p_handler = net_client_handler;
+    cydonia_net_handler_fnctn_t *p_handler = NULL;
+    p_handler = net_tcp_client_handler;
 
-    CHECK( cydonia_tcp_server("", 7777, NULL) == -1 );
-    CHECK( cydonia_tcp_server("", 7777, p_handler) == -1 );
+    CHECK( cydonia_net_server(CYDONIA_NET_TYPE_TCP, "", 7777, NULL) == -1 );
+    CHECK( cydonia_net_server(CYDONIA_NET_TYPE_UDP, "", 7777, p_handler) == -1 );
 
-    CHECK( cydonia_tcp_client("", 7777, NULL) == -1 );
-    CHECK( cydonia_tcp_client("", 7777, p_handler) == -1 );
-
-    // this here works
-    // CHECK( cydonia_tcp_server(NULL, 7777, p_handler) == -1 );
+    CHECK( cydonia_net_client(CYDONIA_NET_TYPE_TCP, "", 7777, NULL) == -1 );
+    CHECK( cydonia_net_client(CYDONIA_NET_TYPE_UDP, "", 7777, p_handler) == -1 );
 
     ret = pthread_create(&server_thread, NULL, test_tcp_server_thread, NULL);
     ret = pthread_create(&client_thread, NULL, test_tcp_client_thread, NULL);
@@ -191,5 +269,10 @@ TEST(Cydonia, cydona_tcp) {
     CHECK( pthread_join(server_thread, NULL) == 0 );
     CHECK( pthread_join(client_thread, NULL) == 0 );
 
+    ret = pthread_create(&server_thread, NULL, test_udp_server_thread, NULL);
+    ret = pthread_create(&client_thread, NULL, test_udp_client_thread, NULL);
+
+    CHECK( pthread_join(server_thread, NULL) == 0 );
+    CHECK( pthread_join(client_thread, NULL) == 0 );
 
 }
