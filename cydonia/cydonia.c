@@ -351,14 +351,13 @@ cydonia_net_server(e_NET_TYPE_t type, char *ip, uint16_t port,
 {
     int ret = -1;
     int sock = -1;
-    int net_type = -1;
     int clientsock = -1;
     struct sockaddr_in addr = {0};
     struct sockaddr_in peer = {0};
     socklen_t addrlen = 0;
     const int enable = 1;
 
-    if(CHECK_NULL((const void*)p_handler))
+    if(NULL == p_handler)
     {
         goto NET_SERVER_FAILURE;
     }
@@ -456,7 +455,7 @@ cydonia_net_client(e_NET_TYPE_t type, char *ip, uint16_t port,
     int net_type = -1;
     struct sockaddr_in addr = {0};
 
-    if(CHECK_NULL(ip) || CHECK_NULL((const void*)p_handler))
+    if(CHECK_NULL(ip) || NULL == p_handler)
     {
         goto NETCLIENT_FAILURE;
     }

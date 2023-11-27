@@ -12,6 +12,9 @@ Utilities currently integrated in Cydonia:
 - [x] TCP Server/Client
 - [x] UDP Server/Client
 
+open:
+- [ ] conversion from hex buffer to hex string and vice versa
+
 Testing
 - [x] unit tests for functions
 - [x] valgrind testing for allocations
@@ -205,8 +208,7 @@ Compile and Run Tests:
 
 ```
 mkdir build && cd build
-cmake -GNinja ../CMakeLists.txt
-# or cmake ../CMakeLists.txt && make
+cmake .. -GNinja -DTARGET_GROUP=test
 ninja -v
 ctest -VV
 ```
